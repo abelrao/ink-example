@@ -1,4 +1,5 @@
 [workspace]
 members=[
-    "erc20_example"
+    "erc20_example",
+    "advaita_health_contract"
 ]
