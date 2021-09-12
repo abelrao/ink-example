@@ -4,49 +4,73 @@ use ink_lang as ink;
 
 #[ink::contract]
 mod advaita_health_contract {
+    use ink_storage::{
+        collections::HashMap as StorageMap,
+        collections::vec::Vec,
+        Lazy,
+    };
 
-    /// Defines the storage of your contract.
-    /// Add new fields to the below struct in order
-    /// to add new static storage fields to your contract.
+    use ink_lang::static_assertions::_core::borrow::Borrow;
+
     #[ink(storage)]
     pub struct AdvaitaHealthContract {
-        /// Stores a single `bool` value on the storage.
-        value: bool,
+        alg_map: StorageMap<AccountId, u64>,
+
     }
+
+
+    pub type Result<T> = core::result::Result<T, Error>;
+
+
+    #[ink(event)]
+    pub struct Update {
+        #[ink(topic)]
+        owner: AccountId,
+    }
+
+    #[ink(event)]
+    pub struct Query {
+        #[ink(topic)]
+        owner: AccountId,
+    }
+
+
+    #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
+    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+    pub enum Error {
+        Updated,
+    }
+
 
     impl AdvaitaHealthContract {
-        /// Constructor that initializes the `bool` value to the given `init_value`.
         #[ink(constructor)]
-        pub fn new(init_value: bool) -> Self {
-            Self { value: init_value }
+        pub fn new() -> Self {
+            let alg_map: StorageMap<AccountId, u64> = StorageMap::new();
+            Self { alg_map }
         }
 
-        /// Constructor that initializes the `bool` value to `false`.
-        ///
-        /// Constructors can delegate to other constructors.
-        #[ink(constructor)]
-        pub fn default() -> Self {
-            Self::new(Default::default())
-        }
 
-        /// A message that can be called on instantiated contracts.
-        /// This one flips the value of the stored `bool` from `true`
-        /// to `false` and vice versa.
         #[ink(message)]
-        pub fn flip(&mut self) {
-            self.value = !self.value;
+        pub fn update(&mut self, info: u64) {
+            let caller = Self::env().caller();
+            self.alg_map.insert(caller, info);
+            Self::env().emit_event(Update {
+                owner: caller,
+            });
         }
 
-        /// Simply returns the current value of our `bool`.
         #[ink(message)]
-        pub fn get(&self) -> bool {
-            self.value
+        pub fn get_list(&self) -> u64 {
+            let caller = Self::env().caller();
+            let re = self.alg_map.get(&caller).unwrap_or(&(0 as u64));
+            Self::env().emit_event(Query {
+                owner: caller,
+            });
+            return *re;
         }
     }
 
-    /// Unit tests in Rust are normally defined within such a `#[cfg(test)]`
-    /// module and test functions are marked with a `#[test]` attribute.
-    /// The below code is technically just normal Rust code.
+
     #[cfg(test)]
     mod tests {
         /// Imports all the definitions from the outer scope so we can use them here.
@@ -58,17 +82,11 @@ mod advaita_health_contract {
         /// We test if the default constructor does its job.
         #[ink::test]
         fn default_works() {
-            let advaita_health_contract = AdvaitaHealthContract::default();
-            assert_eq!(advaita_health_contract.get(), false);
+            let advaita_health_contract = AdvaitaHealthContract::new();
         }
 
         /// We test a simple use case of our contract.
         #[ink::test]
-        fn it_works() {
-            let mut advaita_health_contract = AdvaitaHealthContract::new(false);
-            assert_eq!(advaita_health_contract.get(), false);
-            advaita_health_contract.flip();
-            assert_eq!(advaita_health_contract.get(), true);
-        }
+        fn it_works() {}
     }
 }
