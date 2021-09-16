@@ -1,21 +1,27 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+
 use ink_lang as ink;
+
 
 #[ink::contract]
 mod advaita_health_contract {
     use ink_storage::{
         collections::HashMap as StorageMap,
-        collections::vec::Vec,
+        collections::vec::Vec as StorageVec,
         Lazy,
     };
-
+    use ink_prelude::vec::Vec;
+    use ink_prelude::string::String;
     use ink_lang::static_assertions::_core::borrow::Borrow;
+    use ink_storage::traits::{PackedLayout, SpreadLayout, KeyPtr};
+    use ink_primitives::Key;
+
 
     #[ink(storage)]
     pub struct AdvaitaHealthContract {
-        alg_map: StorageMap<AccountId, u64>,
-
+        questionnaires: StorageMap<(AccountId, u64), Survey>,
+        indexes: StorageMap<AccountId, u64>,
     }
 
 
@@ -26,6 +32,7 @@ mod advaita_health_contract {
     pub struct Update {
         #[ink(topic)]
         owner: AccountId,
+
     }
 
     #[ink(event)]
@@ -45,28 +52,65 @@ mod advaita_health_contract {
     impl AdvaitaHealthContract {
         #[ink(constructor)]
         pub fn new() -> Self {
-            let alg_map: StorageMap<AccountId, u64> = StorageMap::new();
-            Self { alg_map }
+            let quest_map: StorageMap<(AccountId, u64), Survey> = StorageMap::new();
+            let indexes: StorageMap<AccountId, u64> = StorageMap::new();
+            Self {
+                questionnaires: quest_map,
+                indexes,
+            }
         }
 
 
         #[ink(message)]
-        pub fn update(&mut self, info: u64) {
+        pub fn add_survey(&mut self, info: Survey) {
             let caller = Self::env().caller();
-            self.alg_map.insert(caller, info);
+            let index = self.indexes.get(&caller).unwrap_or(&0);
+            let new_index = index + 1;
+            self.questionnaires.insert((caller.clone(), *index), info);
+            self.indexes.insert(caller, new_index);
             Self::env().emit_event(Update {
                 owner: caller,
             });
         }
 
+
         #[ink(message)]
-        pub fn get_list(&self) -> u64 {
+        pub fn get_survey(&self, index: u64) -> Survey {
             let caller = Self::env().caller();
-            let re = self.alg_map.get(&caller).unwrap_or(&(0 as u64));
+            let re = self.questionnaires.get(&(caller, index)).cloned().unwrap_or(Survey::default());
             Self::env().emit_event(Query {
                 owner: caller,
             });
-            return *re;
+            return re;
+        }
+    }
+
+    #[derive(scale::Encode, scale::Decode, SpreadLayout, PackedLayout)]
+    #[cfg_attr(
+    feature = "std",
+    derive(
+    Debug,
+    PartialEq,
+    Eq,
+    scale_info::TypeInfo,
+    ink_storage::traits::StorageLayout
+    )
+    )]
+    pub struct Survey {
+        pub content: String
+    }
+
+    impl Default for Survey {
+        fn default() -> Self {
+            Survey { content: String::new() }
+        }
+    }
+
+    impl Clone for Survey {
+        fn clone(&self) -> Self {
+            Self {
+                content: self.content.clone()
+            }
         }
     }
 
